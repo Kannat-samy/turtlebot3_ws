@@ -22,8 +22,8 @@ def generate_launch_description():
     # Robots
     # =========================
     robots = [
-        {'name': 'robot1', 'x': 0.0,  'y': 0.5},
-        {'name': 'robot2', 'x': 0.0,  'y': -0.5},
+        {'name': 'robot1', 'x': -2.0,  'y': -0.5},
+        {'name': 'robot2', 'x': -2.0,  'y': 0.0},
     ]
 
     # =========================
@@ -110,7 +110,7 @@ def generate_launch_description():
             GroupAction([
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
-                        os.path.join(nav2_dir, 'launch', 'tb3_simulation_launch.py')
+                        os.path.join(this_pkg_dir, 'launch', 'tb3_simulation_launch.py')
                     ),
                     launch_arguments={
                         'namespace': r['name'],

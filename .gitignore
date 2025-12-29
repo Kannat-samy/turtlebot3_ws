@@ -10,3 +10,7 @@ __pycache__/
 *~
 .DS_Store
 
+# ===== Generated TF frames / graphviz =====
+frames_*.gv
+frames_*.pdf
+

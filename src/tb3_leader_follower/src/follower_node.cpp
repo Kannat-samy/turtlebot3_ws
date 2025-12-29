@@ -1,166 +1,179 @@
 #include <cmath>
 #include <memory>
+#include <string>
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 
+using std::placeholders::_1;
+
 class FollowerNode : public rclcpp::Node
 {
 public:
-  FollowerNode() : Node("tb3_follower")
+  FollowerNode() : Node("follower_node")
   {
-    // Paramètres
-    this->declare_parameter<double>("target_distance", 0.10);   // 10 cm
-    this->declare_parameter<double>("kp_dist", 1.0);
-    this->declare_parameter<double>("kp_yaw", 2.0);
-    this->declare_parameter<double>("max_lin_vel", 0.20);
-    this->declare_parameter<double>("max_ang_vel", 1.0);
-    this->declare_parameter<double>("deadband", 0.02);          // +/- 2 cm
-    this->declare_parameter<double>("leader_stop_thresh", 0.02);
+    // -------- PARAMETERS --------
+    leader_odom_topic_   = declare_parameter("leader_odom", "/robot1/odom");
+    follower_odom_topic_ = declare_parameter("follower_odom", "/robot2/odom");
+    cmd_vel_topic_       = declare_parameter("cmd_vel", "/robot2/cmd_vel");
 
-    this->get_parameter("target_distance", target_distance_);
-    this->get_parameter("kp_dist", kp_dist_);
-    this->get_parameter("kp_yaw", kp_yaw_);
-    this->get_parameter("max_lin_vel", max_lin_vel_);
-    this->get_parameter("max_ang_vel", max_ang_vel_);
-    this->get_parameter("deadband", deadband_);
-    this->get_parameter("leader_stop_thresh", leader_stop_thresh_);
+    target_distance_ = declare_parameter("target_distance", 0.5);
+    kp_dist_ = declare_parameter("kp_dist", 0.6);
+    ki_dist_ = declare_parameter("ki_dist", 0.05);
+    kd_dist_ = declare_parameter("kd_dist", 0.15);
+    kp_yaw_  = declare_parameter("kp_yaw", 2.0);
 
-    // ATTENTION : ces topics supposent que plus tard on aura deux robots namespacés
-    // Leader : /tb3_1/odom
-    // Follower : /tb3_2/odom  et /tb3_2/cmd_vel
-    leader_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "/tb3_1/odom", 10,
-      std::bind(&FollowerNode::leaderOdomCallback, this, std::placeholders::_1));
+    max_lin_vel_ = declare_parameter("max_lin_vel", 0.22);
+    max_ang_vel_ = declare_parameter("max_ang_vel", 1.0);
+    max_lin_acc_ = declare_parameter("max_lin_acc", 0.5);
 
-    follower_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "/tb3_2/odom", 10,
-      std::bind(&FollowerNode::followerOdomCallback, this, std::placeholders::_1));
+    deadband_ = declare_parameter("deadband", 0.02);
+    yaw_deadband_ = declare_parameter("yaw_deadband", 0.05);
 
-    follower_cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
-      "/tb3_2/cmd_vel", 10);
+    leader_stop_thresh_ = declare_parameter("leader_stop_thresh", 0.02);
+    leader_stop_hold_s_ = declare_parameter("leader_stop_hold_s", 0.3);
 
-    timer_ = this->create_wall_timer(
+    i_max_ = declare_parameter("i_max", 0.25);
+
+    // -------- ROS --------
+    leader_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+      leader_odom_topic_, 10, std::bind(&FollowerNode::leaderCb, this, _1));
+
+    follower_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+      follower_odom_topic_, 10, std::bind(&FollowerNode::followerCb, this, _1));
+
+    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
+
+    timer_ = create_wall_timer(
       std::chrono::milliseconds(50),
       std::bind(&FollowerNode::controlLoop, this));
 
-    RCLCPP_INFO(this->get_logger(), "FollowerNode initialisé.");
+    RCLCPP_INFO(get_logger(), "Follower node READY");
   }
 
 private:
-  void leaderOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+  // -------- CALLBACKS --------
+  void leaderCb(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
-    leader_odom_ = *msg;
-    leader_odom_received_ = true;
+    leader_ = *msg;
+    leader_ok_ = true;
+
+    double v = std::fabs(msg->twist.twist.linear.x);
+    if (v < leader_stop_thresh_) {
+      if (!leader_stopped_) {
+        leader_stop_time_ = now();
+        leader_stopped_ = true;
+      }
+    } else {
+      leader_stopped_ = false;
+    }
   }
 
-  void followerOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+  void followerCb(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
-    follower_odom_ = *msg;
-    follower_odom_received_ = true;
+    follower_ = *msg;
+    follower_ok_ = true;
   }
 
+  // -------- UTILS --------
   double yawFromQuat(const geometry_msgs::msg::Quaternion &q)
   {
-    double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
-    double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
-    return std::atan2(siny_cosp, cosy_cosp);
+    return std::atan2(
+      2.0 * (q.w * q.z + q.x * q.y),
+      1.0 - 2.0 * (q.y*q.y + q.z*q.z));
   }
 
-  double normalizeAngle(double a)
+  double clamp(double v, double lo, double hi)
   {
-    while (a > M_PI) a -= 2.0 * M_PI;
-    while (a < -M_PI) a += 2.0 * M_PI;
-    return a;
+    return std::max(lo, std::min(v, hi));
   }
 
+  // -------- CONTROL --------
   void controlLoop()
   {
-    if (!leader_odom_received_ || !follower_odom_received_) {
-      return;
+    if (!leader_ok_ || !follower_ok_) return;
+
+    // HOLD strict si leader arrêté
+    if (leader_stopped_) {
+      if ((now() - leader_stop_time_).seconds() > leader_stop_hold_s_) {
+        cmd_pub_->publish(geometry_msgs::msg::Twist());
+        integral_ = 0.0;
+        prev_v_ = 0.0;
+        return;
+      }
     }
 
-    double xL = leader_odom_.pose.pose.position.x;
-    double yL = leader_odom_.pose.pose.position.y;
-    double xF = follower_odom_.pose.pose.position.x;
-    double yF = follower_odom_.pose.pose.position.y;
+    double xL = leader_.pose.pose.position.x;
+    double yL = leader_.pose.pose.position.y;
+    double xF = follower_.pose.pose.position.x;
+    double yF = follower_.pose.pose.position.y;
 
     double dx = xL - xF;
     double dy = yL - yF;
-    double dist = std::sqrt(dx*dx + dy*dy);
+    double dist = std::hypot(dx, dy);
 
-    double follower_yaw = yawFromQuat(follower_odom_.pose.pose.orientation);
-    double desired_yaw = std::atan2(dy, dx);
-    double yaw_error = normalizeAngle(desired_yaw - follower_yaw);
+    double e = dist - target_distance_;
+    if (std::fabs(e) < deadband_) e = 0.0;
 
-    double dist_error = dist - target_distance_;
+    integral_ = clamp(integral_ + e * 0.05, -i_max_, i_max_);
+    double de = (e - prev_error_) / 0.05;
+    prev_error_ = e;
 
-    // Vitesses du leader
-    double vL = leader_odom_.twist.twist.linear.x;
-    double wL = leader_odom_.twist.twist.angular.z;
+    double v_leader = leader_.twist.twist.linear.x;
+    double v_cmd = v_leader + kp_dist_ * e + ki_dist_ * integral_ + kd_dist_ * de;
+
+    // Acceleration limit
+    double dv = v_cmd - prev_v_;
+    double max_dv = max_lin_acc_ * 0.05;
+    dv = clamp(dv, -max_dv, max_dv);
+    v_cmd = prev_v_ + dv;
+    prev_v_ = v_cmd;
+
+    v_cmd = clamp(v_cmd, -max_lin_vel_, max_lin_vel_);
+
+    double yawF = yawFromQuat(follower_.pose.pose.orientation);
+    double yaw_des = std::atan2(dy, dx);
+    double yaw_err = yaw_des - yawF;
+    if (std::fabs(yaw_err) < yaw_deadband_) yaw_err = 0.0;
 
     geometry_msgs::msg::Twist cmd;
+    cmd.linear.x = v_cmd;
+    cmd.angular.z = clamp(kp_yaw_ * yaw_err, -max_ang_vel_, max_ang_vel_);
 
-    // Cas où le leader est quasiment à l'arrêt ET on est à la bonne distance -> stop net
-    if (std::fabs(vL) < leader_stop_thresh_ && std::fabs(dist_error) < deadband_) {
-      cmd.linear.x = 0.0;
-      cmd.angular.z = 0.0;
-      follower_cmd_pub_->publish(cmd);
-      return;
-    }
-
-    // Contrôle distance : ne pas pousser le leader
-    if (dist < target_distance_) {
-      if (dist_error < -deadband_) {
-        cmd.linear.x = kp_dist_ * dist_error;
-      } else {
-        cmd.linear.x = 0.0;
-      }
-    } else {
-      cmd.linear.x = kp_dist_ * dist_error;
-    }
-
-    // Contrôle orientation
-    cmd.angular.z = kp_yaw_ * yaw_error;
-
-    // Saturations
-    if (cmd.linear.x > max_lin_vel_) cmd.linear.x = max_lin_vel_;
-    if (cmd.linear.x < -max_lin_vel_) cmd.linear.x = -max_lin_vel_;
-    if (cmd.angular.z > max_ang_vel_) cmd.angular.z = max_ang_vel_;
-    if (cmd.angular.z < -max_ang_vel_) cmd.angular.z = -max_ang_vel_;
-
-    follower_cmd_pub_->publish(cmd);
+    cmd_pub_->publish(cmd);
   }
 
-  // Params
+  // -------- PARAMS --------
+  std::string leader_odom_topic_, follower_odom_topic_, cmd_vel_topic_;
   double target_distance_;
-  double kp_dist_;
-  double kp_yaw_;
-  double max_lin_vel_;
-  double max_ang_vel_;
-  double deadband_;
-  double leader_stop_thresh_;
+  double kp_dist_, ki_dist_, kd_dist_, kp_yaw_;
+  double max_lin_vel_, max_ang_vel_, max_lin_acc_;
+  double deadband_, yaw_deadband_;
+  double leader_stop_thresh_, leader_stop_hold_s_;
+  double i_max_;
 
-  // Etat
-  nav_msgs::msg::Odometry leader_odom_;
-  nav_msgs::msg::Odometry follower_odom_;
-  bool leader_odom_received_ = false;
-  bool follower_odom_received_ = false;
+  // -------- STATE --------
+  nav_msgs::msg::Odometry leader_, follower_;
+  bool leader_ok_{false}, follower_ok_{false};
+  bool leader_stopped_{false};
 
-  // ROS
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr leader_odom_sub_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr follower_odom_sub_;
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr follower_cmd_pub_;
+  rclcpp::Time leader_stop_time_;
+  double prev_error_{0.0};
+  double integral_{0.0};
+  double prev_v_{0.0};
+
+  // -------- ROS --------
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr leader_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr follower_sub_;
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 
 int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<FollowerNode>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<FollowerNode>());
   rclcpp::shutdown();
   return 0;
 }
-

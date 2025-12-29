@@ -1,0 +1,26 @@
+follower_node:
+  ros__parameters:
+    leader_odom: "/robot1/odom"
+    follower_odom: "/robot2/odom"
+    cmd_vel: "/robot2/cmd_vel"
+
+    target_distance: 0.50
+    delay_steps: 10
+
+    kp_dist: 0.6
+    ki_dist: 0.05
+    kd_dist: 0.15
+
+    kp_yaw: 2.0
+
+    max_lin_vel: 0.22
+    max_ang_vel: 1.0
+    max_lin_acc: 0.5   # m/s²
+
+    deadband: 0.02
+    yaw_deadband: 0.05
+
+    leader_stop_thresh: 0.02
+    leader_stop_hold_s: 0.3
+
+    i_max: 0.25

@@ -29,9 +29,11 @@ from launch_ros.actions import Node
 def generate_launch_description():
     # Get the launch directory
     
-    #this_pkg_dir = get_package_share_directory('tb3_multi_bringup')
+    this_pkg_dir = get_package_share_directory('tb3_multi_bringup')
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
+    # On va chercher le dossier où sont stockés les mondes Turtlebot
+    turtlebot3_gazebo_dir = get_package_share_directory('turtlebot3_gazebo')
 
     # Create the launch configuration variables
     slam = LaunchConfiguration('slam')
@@ -88,7 +90,7 @@ def generate_launch_description():
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
         default_value=os.path.join(
-            bringup_dir, 'maps', 'turtlebot3_world.yaml'),
+            this_pkg_dir, 'maps', 'map_stage3.yaml'),
         description='Full path to map file to load')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
@@ -138,15 +140,25 @@ def generate_launch_description():
         'headless',
         default_value='True',
         description='Whether to execute gzclient)')
+    
 
     declare_world_cmd = DeclareLaunchArgument(
         'world',
-        # TODO(orduno) Switch back once ROS argument passing has been fixed upstream
-        #              https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/91
-        # default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
-        # worlds/turtlebot3_worlds/waffle.model')
-        default_value=os.path.join(bringup_dir, 'worlds', 'world_only.model'),
+        # On pointe spécifiquement vers le fichier Stage 4
+        default_value=os.path.join(
+            turtlebot3_gazebo_dir,
+            'worlds',
+            'turtlebot3_dqn_stage3.world'), 
         description='Full path to world model file to load')
+
+    #declare_world_cmd = DeclareLaunchArgument(
+    #    'world',
+    #    # TODO(orduno) Switch back once ROS argument passing has been fixed upstream
+    #    #              https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/91
+    #    # default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
+    #    # worlds/turtlebot3_worlds/waffle.model')
+    #    default_value=os.path.join(bringup_dir, 'worlds', 'world_only.model'),
+    #    description='Full path to world model file to load')
 
     declare_robot_name_cmd = DeclareLaunchArgument(
         'robot_name',

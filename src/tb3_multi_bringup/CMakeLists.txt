@@ -21,7 +21,7 @@ install(
   rviz
   params
   urdf
-  worlds
+  maps
   DESTINATION share/${PROJECT_NAME}
 )
 

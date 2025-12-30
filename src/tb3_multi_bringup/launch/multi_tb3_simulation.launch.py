@@ -4,9 +4,11 @@ from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, GroupAction, IncludeLaunchDescription, LogInfo
+from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, ExecuteProcess, GroupAction, IncludeLaunchDescription, LogInfo
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, TextSubstitution
+from launch.actions import AppendEnvironmentVariable
 
 
 def generate_launch_description():
@@ -17,6 +19,26 @@ def generate_launch_description():
     nav2_dir = get_package_share_directory('nav2_bringup')
     nav2_launch_dir = os.path.join(nav2_dir, 'launch')
     this_pkg_dir = get_package_share_directory('tb3_multi_bringup')
+
+
+
+
+    # 1. On localise le dossier des modèles
+    try:
+        turtlebot3_gazebo_dir = get_package_share_directory('turtlebot3_gazebo')
+        models_dir = os.path.join(turtlebot3_gazebo_dir, 'models')
+    except:
+        models_dir = "" # Juste au cas où, pour pas que ça plante
+
+    # 2. On crée l'action pour dire à Gazebo où ils sont
+    # C'est ÇA qui fait apparaitre les murs
+    set_model_path_cmd = AppendEnvironmentVariable(
+        name='GAZEBO_MODEL_PATH',
+        value=models_dir
+    )
+
+
+
 
     # =========================
     # Robots
@@ -38,14 +60,26 @@ def generate_launch_description():
     # =========================
     # Declare arguments
     # =========================
+
+
     declare_world = DeclareLaunchArgument(
         'world',
-        default_value=os.path.join(nav2_dir, 'worlds', 'world_only.model')
+        default_value=os.path.join(
+            turtlebot3_gazebo_dir, 
+            'worlds', 
+            'turtlebot3_dqn_stage3.world' # Attention: pas d'espace à la fin !
+        ),
+        description='Full path to world model file to load'
     )
+    
+    #declare_world = DeclareLaunchArgument(
+    #    'world',
+    #    default_value=os.path.join(this_pkg_dir, 'worlds', 'world_only.model')
+    #)
 
     declare_map = DeclareLaunchArgument(
         'map',
-        default_value=os.path.join(nav2_dir, 'maps', 'turtlebot3_world.yaml')
+        default_value=os.path.join(this_pkg_dir, 'maps', 'map_stage3.yaml')
     )
 
     declare_autostart = DeclareLaunchArgument(
@@ -163,6 +197,7 @@ def generate_launch_description():
     # =========================
     ld = LaunchDescription()
 
+    ld.add_action(set_model_path_cmd)
     ld.add_action(declare_world)
     ld.add_action(declare_map)
     ld.add_action(declare_autostart)

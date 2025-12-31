@@ -44,7 +44,7 @@ def generate_launch_description():
     # Robots
     # =========================
     robots = [
-        {'name': 'robot1', 'x': -2.0,  'y': -0.5},
+        {'name': 'robot1', 'x': -2.0,  'y': -1.0},
         {'name': 'robot2', 'x': -2.0,  'y': 0.0},
     ]
 

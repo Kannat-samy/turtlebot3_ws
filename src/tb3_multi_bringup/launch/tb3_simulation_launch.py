@@ -90,7 +90,7 @@ def generate_launch_description():
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
         default_value=os.path.join(
-            this_pkg_dir, 'maps', 'map_stage3.yaml'),
+            this_pkg_dir, 'maps', 'map_stage4.yaml'),
         description='Full path to map file to load')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
@@ -148,7 +148,7 @@ def generate_launch_description():
         default_value=os.path.join(
             turtlebot3_gazebo_dir,
             'worlds',
-            'turtlebot3_dqn_stage3.world'), 
+            'turtlebot3_dqn_stage4.world'), 
         description='Full path to world model file to load')
 
     #declare_world_cmd = DeclareLaunchArgument(
@@ -164,10 +164,12 @@ def generate_launch_description():
         'robot_name',
         default_value='turtlebot3_waffle',
         description='name of the robot')
+    
+
 
     declare_robot_sdf_cmd = DeclareLaunchArgument(
         'robot_sdf',
-        default_value=os.path.join(bringup_dir, 'worlds', 'waffle.model'),
+        default_value=os.path.join(this_pkg_dir, 'models', 'waffle.model'),
         description='Full path to robot sdf file to spawn the robot in gazebo')
 
     # Specify the actions

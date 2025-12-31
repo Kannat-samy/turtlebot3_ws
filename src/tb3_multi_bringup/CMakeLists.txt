@@ -22,6 +22,7 @@ install(
   params
   urdf
   maps
+  models
   DESTINATION share/${PROJECT_NAME}
 )
 

@@ -67,7 +67,7 @@ def generate_launch_description():
         default_value=os.path.join(
             turtlebot3_gazebo_dir, 
             'worlds', 
-            'turtlebot3_dqn_stage3.world' # Attention: pas d'espace à la fin !
+            'turtlebot3_dqn_stage4.world' # Attention: pas d'espace à la fin !
         ),
         description='Full path to world model file to load'
     )
@@ -79,7 +79,7 @@ def generate_launch_description():
 
     declare_map = DeclareLaunchArgument(
         'map',
-        default_value=os.path.join(this_pkg_dir, 'maps', 'map_stage3.yaml')
+        default_value=os.path.join(this_pkg_dir, 'maps', 'map_stage4.yaml')
     )
 
     declare_autostart = DeclareLaunchArgument(
@@ -99,7 +99,7 @@ def generate_launch_description():
 
     declare_robot1_params = DeclareLaunchArgument(
         'robot1_params_file',
-        default_value=os.path.join(nav2_dir, 'params', 'nav2_multirobot_params_1.yaml')
+        default_value=os.path.join(this_pkg_dir, 'params', 'robot1_nav2.yaml')
     )
 
     # =========================
@@ -151,7 +151,8 @@ def generate_launch_description():
                         'use_namespace': 'True',
                         'map': map_yaml,
                         'use_sim_time': 'True',
-                        'params_file': LaunchConfiguration(f"{r['name']}_params_file")
+                        # ON FORCE LE CHEMIN ABSOLU
+                        'params_file': '/home/samy/turtlebot3_ws/src/tb3_multi_bringup/params/robot1_nav2.yaml'
                             if r['name'] == 'robot1'
                             else os.path.join(nav2_dir, 'params', 'nav2_multirobot_params_2.yaml'),
                         'autostart': autostart,
@@ -172,25 +173,7 @@ def generate_launch_description():
             ])
         )
 
-    # =========================
-    # Nav2 UNIQUEMENT robot1
-    # =========================
-    nav2_robot1 = GroupAction([
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(nav2_launch_dir, 'bringup_launch.py')
-            ),
-            launch_arguments={
-                'namespace': 'robot1',
-                'use_namespace': 'True',
-                'map': map_yaml,
-                'use_sim_time': 'True',
-                'params_file': LaunchConfiguration('robot1_params_file'),
-                'autostart': autostart,
-                'use_rviz': 'False',
-            }.items()
-        )
-    ])
+
 
     # =========================
     # Launch description
@@ -211,6 +194,6 @@ def generate_launch_description():
     for c in spawn_cmds:
         ld.add_action(c)
 
-    ld.add_action(nav2_robot1)
+
 
     return ld

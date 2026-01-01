@@ -90,7 +90,7 @@ def generate_launch_description():
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
         default_value=os.path.join(
-            this_pkg_dir, 'maps', 'turtlebot3_world.yaml'),
+            this_pkg_dir, 'maps', 'map_stage2.yaml'),
         description='Full path to map file to load')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
@@ -148,7 +148,7 @@ def generate_launch_description():
         default_value=os.path.join(
             turtlebot3_gazebo_dir,
             'worlds',
-            'turtlebot3_world.world'), 
+            'turtlebot3_dqn_stage2.world'), 
         description='Full path to world model file to load')
 
     #declare_world_cmd = DeclareLaunchArgument(

@@ -19,7 +19,7 @@ def generate_launch_description():
     # A. Gazebo (Ton monde Stage 4)
     gazebo_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_gazebo_ros, 'launch', 'turtlebot3_dqn_stage4.launch.py')
+            os.path.join(pkg_gazebo_ros, 'launch', 'myturtlebot3_world.launch.py')
         )
     )
 

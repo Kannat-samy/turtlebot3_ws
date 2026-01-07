@@ -67,7 +67,7 @@ def generate_launch_description():
         default_value=os.path.join(
             turtlebot3_gazebo_dir, 
             'worlds', 
-            'turtlebot3_dqn_stage4.world' # Attention: pas d'espace à la fin !
+            'turtlebot3_world.world' # Attention: pas d'espace à la fin !
         ),
         description='Full path to world model file to load'
     )
@@ -79,7 +79,7 @@ def generate_launch_description():
 
     declare_map = DeclareLaunchArgument(
         'map',
-        default_value=os.path.join(this_pkg_dir, 'maps', 'map_stage4.yaml')
+        default_value=os.path.join(this_pkg_dir, 'maps', 'turtlebot3_world.yaml')
     )
 
     declare_autostart = DeclareLaunchArgument(

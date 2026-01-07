@@ -45,7 +45,7 @@ def generate_launch_description():
     # D. Ton script Auto Explorer
     # --- CORRECTION 2 : Le chemin vers ton script à la racine ---
     explorer_cmd = ExecuteProcess(
-        cmd=['python3', '/home/samy/turtlebot3_ws/auto_explorer.py'],
+        cmd=['python3', '/home/samy/turtlebot3_ws/src/auto_explorer.py'],
         output='screen'
     )
 
@@ -59,9 +59,9 @@ def generate_launch_description():
     ld.add_action(TimerAction(period=10.0, actions=[cartographer_cmd]))
 
     # +20s : Nav2 (Navigation)
-    ld.add_action(TimerAction(period=20.0, actions=[nav2_cmd]))
+    ld.add_action(TimerAction(period=15.0, actions=[nav2_cmd]))
 
     # +30s : Ton script (Explorer)
-    ld.add_action(TimerAction(period=30.0, actions=[explorer_cmd]))
+    ld.add_action(TimerAction(period=20.0, actions=[explorer_cmd]))
 
     return ld
